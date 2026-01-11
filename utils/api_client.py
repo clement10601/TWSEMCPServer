@@ -22,14 +22,34 @@ class TWSEAPIClient:
     
     # Cache configuration
     _cache_enabled = os.getenv('CACHE_ENABLED', 'true').lower() == 'true'
-    _cache_dir = Path(os.getenv('CACHE_DIR', '/app/cache'))
+    _cache_dir = Path(os.getenv('CACHE_DIR', './cache'))  # Use relative path by default
     _cache_ttl = int(os.getenv('CACHE_TTL', '3600'))  # Default 1 hour
+    _initialized = False
+    
+    @classmethod
+    def _initialize_cache(cls):
+        """Initialize cache system and log configuration."""
+        if not cls._initialized:
+            logger.info("="*60)
+            logger.info("TWSE API Client Cache Configuration:")
+            logger.info(f"  Cache Enabled: {cls._cache_enabled}")
+            logger.info(f"  Cache Directory: {cls._cache_dir.absolute()}")
+            logger.info(f"  Cache TTL: {cls._cache_ttl} seconds")
+            logger.info("="*60)
+            if cls._cache_enabled:
+                cls._ensure_cache_dir()
+            cls._initialized = True
     
     @classmethod
     def _ensure_cache_dir(cls):
         """Ensure cache directory exists."""
         if cls._cache_enabled:
-            cls._cache_dir.mkdir(parents=True, exist_ok=True)
+            try:
+                cls._cache_dir.mkdir(parents=True, exist_ok=True)
+                logger.info(f"Cache directory ready: {cls._cache_dir.absolute()}")
+            except Exception as e:
+                logger.error(f"Failed to create cache directory {cls._cache_dir}: {e}")
+                cls._cache_enabled = False
     
     @classmethod
     def _get_cache_path(cls, endpoint: str) -> Path:
@@ -67,9 +87,10 @@ class TWSEAPIClient:
             cls._ensure_cache_dir()
             with open(cache_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
-                logger.info(f"Cached data to {cache_path.name}")
+                file_size = cache_path.stat().st_size
+                logger.info(f"✓ Cached data to {cache_path.name} ({file_size:,} bytes)")
         except Exception as e:
-            logger.warning(f"Failed to write cache {cache_path}: {e}")
+            logger.warning(f"✗ Failed to write cache {cache_path}: {e}")
     
     @classmethod
     def get_data(cls, endpoint: str, timeout: float = 30.0) -> List[Dict[str, Any]]:
