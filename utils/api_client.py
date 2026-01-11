@@ -4,6 +4,9 @@ import requests
 import logging
 import time
 import os
+import json
+import hashlib
+from pathlib import Path
 from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
@@ -17,10 +20,61 @@ class TWSEAPIClient:
     # 從環境變數讀取 API 請求間隔，預設為 0.5 秒
     _min_request_interval = float(os.getenv('API_REQUEST_DELAY', '0.5'))
     
+    # Cache configuration
+    _cache_enabled = os.getenv('CACHE_ENABLED', 'true').lower() == 'true'
+    _cache_dir = Path(os.getenv('CACHE_DIR', '/app/cache'))
+    _cache_ttl = int(os.getenv('CACHE_TTL', '3600'))  # Default 1 hour
+    
+    @classmethod
+    def _ensure_cache_dir(cls):
+        """Ensure cache directory exists."""
+        if cls._cache_enabled:
+            cls._cache_dir.mkdir(parents=True, exist_ok=True)
+    
+    @classmethod
+    def _get_cache_path(cls, endpoint: str) -> Path:
+        """Get cache file path for an endpoint."""
+        # Create a hash of the endpoint to use as filename
+        endpoint_hash = hashlib.md5(endpoint.encode()).hexdigest()
+        return cls._cache_dir / f"{endpoint_hash}.json"
+    
+    @classmethod
+    def _is_cache_valid(cls, cache_path: Path) -> bool:
+        """Check if cache file exists and is still valid."""
+        if not cache_path.exists():
+            return False
+        
+        # Check if cache has expired
+        cache_age = time.time() - cache_path.stat().st_mtime
+        return cache_age < cls._cache_ttl
+    
+    @classmethod
+    def _read_cache(cls, cache_path: Path) -> Optional[List[Dict[str, Any]]]:
+        """Read data from cache file."""
+        try:
+            with open(cache_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                logger.info(f"Cache hit for {cache_path.name}")
+                return data
+        except Exception as e:
+            logger.warning(f"Failed to read cache {cache_path}: {e}")
+            return None
+    
+    @classmethod
+    def _write_cache(cls, cache_path: Path, data: List[Dict[str, Any]]):
+        """Write data to cache file."""
+        try:
+            cls._ensure_cache_dir()
+            with open(cache_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+                logger.info(f"Cached data to {cache_path.name}")
+        except Exception as e:
+            logger.warning(f"Failed to write cache {cache_path}: {e}")
+    
     @classmethod
     def get_data(cls, endpoint: str, timeout: float = 30.0) -> List[Dict[str, Any]]:
         """
-        Fetch data from TWSE API endpoint.
+        Fetch data from TWSE API endpoint with caching support.
         
         Args:
             endpoint: API endpoint path (e.g., "/opendata/t187ap03_L")
@@ -32,6 +86,14 @@ class TWSEAPIClient:
         Raises:
             Exception: If API request fails
         """
+        # Check cache first if enabled
+        if cls._cache_enabled:
+            cache_path = cls._get_cache_path(endpoint)
+            if cls._is_cache_valid(cache_path):
+                cached_data = cls._read_cache(cache_path)
+                if cached_data is not None:
+                    return cached_data
+        
         # 實施速率限制，避免被視為 DDOS 攻擊
         current_time = time.time()
         time_since_last_request = current_time - cls._last_request_time
@@ -65,7 +127,13 @@ class TWSEAPIClient:
                 logger.warning(f"Response is not valid JSON for {url}: {parse_err}; returning empty list for robustness")
                 return []
 
-            return data if isinstance(data, list) else ([data] if data else [])
+            result = data if isinstance(data, list) else ([data] if data else [])
+            
+            # Cache the result if enabled
+            if cls._cache_enabled and result:
+                cls._write_cache(cache_path, result)
+            
+            return result
             
         except Exception as e:
             logger.error(f"Failed to fetch data from {url}: {e}")
