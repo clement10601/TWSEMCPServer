@@ -107,6 +107,9 @@ class TWSEAPIClient:
         Raises:
             Exception: If API request fails
         """
+        # Initialize cache on first use
+        cls._initialize_cache()
+        
         # Check cache first if enabled
         if cls._cache_enabled:
             cache_path = cls._get_cache_path(endpoint)
