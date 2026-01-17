@@ -154,3 +154,16 @@ def register_tools(mcp):
             return format_multiple_records(data)
         except Exception:
             return ""
+
+    @mcp.tool
+    def get_market_breadth() -> str:
+        """Get market breadth indicators showing advancing vs declining stocks.
+        
+        Returns statistics about rising and falling securities in the centralized market,
+        providing a broad view of market sentiment and participation.
+        """
+        try:
+            data = TWSEAPIClient.get_data("/opendata/twtazu_od")
+            return format_multiple_records(data) if data else ""
+        except Exception:
+            return ""

@@ -37,10 +37,11 @@ def register_tools(mcp):
             
             result = f"共有 {len(data)} 筆投資理財節目異常推介個股資料：\n\n"
             for item in data[:20]:  # Limit to first 20 for readability
-                stock_code = item.get("證券代號", "N/A")
-                stock_name = item.get("證券名稱", "N/A")
-                program_name = item.get("節目名稱", "N/A")
-                result += f"- {stock_name} ({stock_code}): {program_name}\n"
+                number = item.get("Number", "N/A")
+                stock_code = item.get("Code", "N/A")
+                stock_name = item.get("Name", "N/A")
+                date = item.get("Date", "N/A")
+                result += f"- {stock_name} ({stock_code}): 日期 {date}, 編號 {number}\n"
             
             if len(data) > 20:
                 result += f"\n... 還有 {len(data) - 20} 筆資料"
@@ -66,6 +67,43 @@ def register_tools(mcp):
             
             if len(data) > 20:
                 result += f"\n... 還有 {len(data) - 20} 筆資料"
+            
+            return result
+        except Exception as e:
+            return f"查詢失敗: {str(e)}"
+
+    @mcp.tool
+    def get_day_trading_volume_rank() -> str:
+        """Get stocks ranked by day trading volume.
+        
+        Returns daily day trading targets sorted by trading volume from highest to lowest,
+        showing which stocks have the most active day trading activity.
+        """
+        try:
+            data = TWSEAPIClient.get_data("/exchangeReport/TWTB4U")
+            if not data:
+                return "目前沒有當日沖銷交易量排行資料。"
+            
+            # Sort by day trading volume (try multiple possible field names)
+            def get_volume(item):
+                volume_str = item.get("DayTradingVolume", item.get("當日沖銷交易量", item.get("TradeVolume", "0")))
+                try:
+                    # Remove commas and convert to float
+                    return float(str(volume_str).replace(",", "")) if volume_str and volume_str != "N/A" else 0
+                except:
+                    return 0
+            
+            sorted_data = sorted(data, key=get_volume, reverse=True)
+            
+            # Take top 30
+            top_data = sorted_data[:30]
+            
+            result = f"當日沖銷交易量排行 (Top {len(top_data)}):\n\n"
+            for idx, item in enumerate(top_data, 1):
+                stock_code = item.get("Code", item.get("證券代號", "N/A"))
+                stock_name = item.get("Name", item.get("證券名稱", "N/A"))
+                day_trading_volume = item.get("DayTradingVolume", item.get("當日沖銷交易量", "N/A"))
+                result += f"{idx}. {stock_name} ({stock_code}): {day_trading_volume}\n"
             
             return result
         except Exception as e:
@@ -196,11 +234,13 @@ def register_tools(mcp):
             
             result = f"共有 {len(data)} 筆集中市場零股交易行情單資料：\n\n"
             for item in data[:20]:  # Limit to first 20 for readability
-                stock_code = item.get("證券代號", "N/A")
-                stock_name = item.get("證券名稱", "N/A")
-                price = item.get("成交價", "N/A")
-                volume = item.get("成交量", "N/A")
-                result += f"- {stock_name} ({stock_code}): 成交價 {price}, 成交量 {volume}\n"
+                stock_code = item.get("Code", "N/A")
+                stock_name = item.get("Name", "N/A")
+                trade_price = item.get("TradePrice", "N/A")
+                trade_volume = item.get("TradeVolume", "N/A")
+                transaction = item.get("Transaction", "N/A")
+                trade_value = item.get("TradeValue", "N/A")
+                result += f"- {stock_name} ({stock_code}): 成交價 {trade_price}, 成交股數 {trade_volume}, 成交筆數 {transaction}, 成交金額 {trade_value}\n"
             
             if len(data) > 20:
                 result += f"\n... 還有 {len(data) - 20} 筆資料"
@@ -286,10 +326,13 @@ def register_tools(mcp):
             
             result = f"共有 {len(data)} 筆集中市場鉅額交易日成交量值統計資料：\n\n"
             for item in data[:20]:  # Limit to first 20 for readability
-                date = item.get("日期", "N/A")
-                trade_count = item.get("交易筆數", "N/A")
-                total_value = item.get("總成交金額", "N/A")
-                result += f"- {date}: {trade_count} 筆, 總成交金額 {total_value}\n"
+                date = item.get("Date", "N/A")
+                trade_class = item.get("Class", "N/A")
+                trade_type = item.get("Type", "N/A")
+                trade_volume = item.get("TradeVolume", "N/A")
+                market_share = item.get("MarketSharePer", "N/A")
+                trade_value = item.get("TradeValue", "N/A")
+                result += f"- {date} ({trade_class}/{trade_type}): 成交股數 {trade_volume}, 成交金額 {trade_value}, 占市場比重 {market_share}%\n"
             
             if len(data) > 20:
                 result += f"\n... 還有 {len(data) - 20} 筆資料"

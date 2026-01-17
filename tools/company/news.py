@@ -161,3 +161,17 @@ def register_tools(mcp):
             return format_multiple_records(data) if data else ""
         except Exception:
             return ""
+
+    @mcp.tool
+    def get_stock_suspension_news() -> str:
+        """
+        Get trading suspension announcements for securities.
+        
+        Returns information about stocks that are currently suspended from trading
+        in the centralized market, including the suspension reason.
+        """
+        try:
+            data = TWSEAPIClient.get_data("/exchangeReport/TWTAWU")
+            return format_multiple_records(data) if data else ""
+        except Exception:
+            return ""

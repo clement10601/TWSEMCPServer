@@ -98,6 +98,39 @@ def register_tools(mcp):
             return ""
 
     @mcp.tool
+    def get_daily_insider_trades_by_all_companies() -> str:
+        """Get all insider trades across the entire market without filtering by company.
+        
+        Returns daily insider share transfer pre-announcements for all listed companies,
+        providing a market-wide view of insider trading activity.
+        """
+        try:
+            data = TWSEAPIClient.get_data("/opendata/t187ap12_L")
+            if not data:
+                return ""
+            
+            # Limit to recent 50 records to avoid too much data
+            limited_data = data[:50] if len(data) > 50 else data
+            result = f"共有 {len(data)} 筆內部人持股轉讓申報資料（顯示前 {len(limited_data)} 筆）:\n\n"
+            
+            for item in limited_data:
+                company_code = item.get("公司代號", item.get("Code", "N/A"))
+                company_name = item.get("公司名稱", item.get("Name", "N/A"))
+                insider_name = item.get("內部人姓名", item.get("InsiderName", "N/A"))
+                position = item.get("職稱", item.get("Position", "N/A"))
+                transfer_shares = item.get("申報轉讓股數", item.get("TransferShares", "N/A"))
+                transfer_date = item.get("預定轉讓日期", item.get("TransferDate", "N/A"))
+                
+                result += f"- {company_name} ({company_code})\n"
+                result += f"  內部人: {insider_name} ({position})\n"
+                result += f"  申報轉讓股數: {transfer_shares}\n"
+                result += f"  預定轉讓日期: {transfer_date}\n\n"
+            
+            return result
+        except Exception:
+            return ""
+
+    @mcp.tool
     def get_company_daily_insider_trades_untransferred(code: str) -> str:
         """Obtain daily insider share transfers that have not yet been executed for a listed company based on its stock code."""
         try:
