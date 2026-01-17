@@ -278,3 +278,12 @@ def register_tools(mcp):
             return format_properties_with_values_multiline(data) if data else ""
         except Exception:
             return ""
+
+    @mcp.tool
+    def get_company_occupational_safety_health(code: str) -> str:
+        """Obtain occupational safety and health information for a listed company based on its stock code."""
+        try:
+            data = TWSEAPIClient.get_company_data("/opendata/t187ap46_L_21", code)
+            return format_properties_with_values_multiline(data) if data else ""
+        except Exception:
+            return ""
